@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Offline IT Helpdesk</title>
+<style>
+:root{--bg:#f7f8fa;--panel:#fff;--fg:#111827;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;
+--accent-fg:#fff;--warn:#b45309;--chip:#eef2ff}
+@media (prefers-color-scheme:dark){:root{--bg:#0b0f17;--panel:#111827;--fg:#e5e7eb;--muted:#9ca3af;
+--line:#1f2937;--accent:#3b82f6;--warn:#fbbf24;--chip:#1e293b}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:860px;margin:0 auto;padding:24px 16px 48px}
+header{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+h1{font-size:22px;margin:0}.muted{color:var(--muted);font-size:13px}
+form{display:flex;gap:8px;margin:18px 0}
+input{flex:1;min-width:0;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--fg);font:inherit}
+button{padding:12px 18px;border:0;border-radius:10px;background:var(--accent);color:var(--accent-fg);font:inherit;font-weight:600;cursor:pointer}
+button:disabled{opacity:.6;cursor:wait}
+.examples{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.examples button{background:var(--chip);color:var(--fg);font-weight:400;padding:6px 10px;font-size:13px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-top:14px}
+.q{font-weight:600;margin-bottom:8px}.answer{white-space:pre-wrap}
+.refused{color:var(--warn)}
+.sources{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
+.src{font-size:13px;margin:6px 0}.src a{color:var(--accent)}
+.meta{margin-top:8px}
+sup.c{color:var(--accent);font-weight:600}
+code{font:13px ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--chip);padding:1px 5px;border-radius:4px}
+pre.doc{white-space:pre-wrap;font-size:13px;max-height:360px;overflow:auto;background:var(--bg);padding:10px;border-radius:8px}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Offline IT Helpdesk</h1>
+    <span id="status" class="muted">checking…</span>
+  </header>
+  <p class="muted">Answers come only from the local runbooks, with citations. Nothing leaves this machine.</p>
+  <form id="ask">
+    <input id="q" autocomplete="off" placeholder="e.g. My account is locked, what do I do?" aria-label="Question">
+    <button id="go" type="submit">Ask</button>
+  </form>
+  <div class="examples" id="examples"></div>
+  <div id="out"></div>
+</main>
+<script>
+const EXAMPLES = ["How do I reset my password?", "VPN says portal not reachable",
+  "I lost my phone with the authenticator app", "How long are print jobs kept?",
+  "BitLocker is asking for a recovery key"];
+const $ = (id) => document.getElementById(id);
+const esc = (s) => s.replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+
+for (const ex of EXAMPLES) {
+  const b = document.createElement("button"); b.type = "button"; b.textContent = ex;
+  b.onclick = () => { $("q").value = ex; ask(ex); }; $("examples").appendChild(b);
+}
+
+fetch("/health").then(r => r.json()).then(h => {
+  $("status").textContent = `${h.llm_backend} · ${h.embedder} · ${h.chunks} chunks` +
+    (h.status === "ok" ? "" : " · LLM offline");
+}).catch(() => { $("status").textContent = "API offline"; });
+
+async function showDoc(ev, doc) {
+  ev.preventDefault();
+  const holder = ev.target.closest(".src");
+  const existing = holder.querySelector("pre");
+  if (existing) { existing.remove(); return; }
+  const text = await (await fetch(`/kb/${encodeURIComponent(doc)}`)).text();
+  const pre = document.createElement("pre"); pre.className = "doc"; pre.textContent = text;
+  holder.appendChild(pre);
+}
+
+async function ask(question) {
+  if (!question.trim()) return;
+  $("go").disabled = true;
+  const card = document.createElement("div"); card.className = "card";
+  card.innerHTML = `<div class="q">${esc(question)}</div><div class="muted">Thinking…</div>`;
+  $("out").prepend(card);
+  try {
+    const r = await fetch("/ask", {method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({question})});
+    const a = await r.json();
+    if (!r.ok) throw new Error(a.detail ? JSON.stringify(a.detail) : r.statusText);
+    // Escape first, then apply a tiny safe subset of Markdown (bold, inline code).
+    const text = esc(a.answer)
+      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+      .replace(/`([^`]+)`/g, "<code>$1</code>")
+      .replace(/\[(\d+)\]/g, '<sup class="c">[$1]</sup>');
+    const srcs = a.citations.map(c => `<div class="src"><sup class="c">[${c.n}]</sup>
+      <a href="#" data-doc="${esc(c.doc)}">${esc(c.title)}${c.section ? " › " + esc(c.section) : ""}</a>
+      <span class="muted">${esc(c.doc)} · similarity ${c.dense.toFixed(2)}</span>
+      <div class="muted">${esc(c.snippet)}</div></div>`).join("");
+    // Small models sometimes omit [n] markers: still show what was retrieved, labelled honestly.
+    const consulted = (!srcs && !a.refused) ? `<div class="sources"><div class="muted">Sources consulted (the model did not cite them explicitly):</div>` +
+      a.retrieved.map(r => `<div class="src"><a href="#" data-doc="${esc(r.doc)}">${esc(r.doc)}${r.section ? " › " + esc(r.section) : ""}</a>
+      <span class="muted">similarity ${r.dense.toFixed(2)}</span></div>`).join("") + `</div>` : "";
+    card.innerHTML = `<div class="q">${esc(question)}</div>
+      <div class="answer ${a.refused ? "refused" : ""}">${text}</div>
+      ${srcs ? `<div class="sources">${srcs}</div>` : consulted}
+      <div class="meta muted">${a.backend} · retrieval ${a.retrieve_ms.toFixed(0)} ms · generation ${a.generate_ms.toFixed(0)} ms</div>`;
+    card.querySelectorAll("a[data-doc]").forEach(el => el.onclick = (ev) => showDoc(ev, el.dataset.doc));
+  } catch (e) {
+    card.innerHTML = `<div class="q">${esc(question)}</div><div class="refused">Error: ${esc(String(e.message || e))}</div>`;
+  } finally { $("go").disabled = false; }
+}
+
+$("ask").addEventListener("submit", (e) => { e.preventDefault(); ask($("q").value); });
+const initial = new URLSearchParams(location.search).get("q");  // shareable links: /?q=...
+if (initial) { $("q").value = initial; ask(initial); }
+</script>
+</body>
+</html>
