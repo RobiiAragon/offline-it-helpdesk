@@ -1,0 +1,40 @@
+{"id": "q01", "question": "How many failed logins before my account gets locked?", "expected_doc": "password-reset.md", "must_include": ["10", "30 minutes"], "answerable": true}
+{"id": "q02", "question": "What is the minimum length for a new password?", "expected_doc": "password-reset.md", "must_include": ["14"], "answerable": true}
+{"id": "q03", "question": "Where can I reset my password myself?", "expected_doc": "password-reset.md", "must_include": ["sspr.example.com"], "answerable": true}
+{"id": "q04", "question": "I changed my password but Wi-Fi and VPN still reject it", "expected_doc": "password-reset.md", "must_include": ["15 minutes"], "answerable": true}
+{"id": "q05", "question": "I got a new phone, how do I move my authenticator?", "expected_doc": "mfa.md", "must_include": ["add", "remove"], "answerable": true}
+{"id": "q06", "question": "My phone with the MFA app was stolen, what should I do?", "expected_doc": "mfa.md", "must_include": ["4357"], "answerable": true}
+{"id": "q07", "question": "I'm getting MFA approval requests that I didn't trigger", "expected_doc": "mfa.md", "must_include": ["deny", "password"], "answerable": true}
+{"id": "q08", "question": "How can I get a hardware security key?", "expected_doc": "mfa.md", "must_include": ["building b"], "answerable": true}
+{"id": "q09", "question": "What address do I put in GlobalProtect?", "expected_doc": "vpn.md", "must_include": ["vpn.example.com"], "answerable": true}
+{"id": "q10", "question": "The VPN keeps disconnecting every few minutes", "expected_doc": "vpn.md", "must_include": ["wired|hotspot"], "answerable": true}
+{"id": "q11", "question": "VPN is connected but intranet pages won't load", "expected_doc": "vpn.md", "must_include": ["flushdns|flushcache"], "answerable": true}
+{"id": "q12", "question": "Can I install the VPN on my personal computer?", "expected_doc": "vpn.md", "must_include": ["not allowed|personal"], "answerable": true}
+{"id": "q13", "question": "Which Wi-Fi should visitors use?", "expected_doc": "wifi.md", "must_include": ["guest"], "answerable": true}
+{"id": "q14", "question": "My work laptop can't connect to CORP-SECURE", "expected_doc": "wifi.md", "must_include": ["certificate|gpupdate"], "answerable": true}
+{"id": "q15", "question": "How do I pick up my print job at the printer?", "expected_doc": "printers.md", "must_include": ["badge"], "answerable": true}
+{"id": "q16", "question": "How long do print jobs wait before being deleted?", "expected_doc": "printers.md", "must_include": ["24 hours"], "answerable": true}
+{"id": "q17", "question": "What's the maximum size of an email attachment?", "expected_doc": "email-outlook.md", "must_include": ["25 mb"], "answerable": true}
+{"id": "q18", "question": "How do I recover an email I deleted last week?", "expected_doc": "email-outlook.md", "must_include": ["recover deleted items"], "answerable": true}
+{"id": "q19", "question": "Outlook keeps prompting for my password over and over", "expected_doc": "email-outlook.md", "must_include": ["credential manager|profile"], "answerable": true}
+{"id": "q20", "question": "I clicked a link in a suspicious email and typed my password", "expected_doc": "phishing.md", "must_include": ["sspr.example.com|change your password", "4357"], "answerable": true}
+{"id": "q21", "question": "How do I report a phishing email?", "expected_doc": "phishing.md", "must_include": ["report phishing"], "answerable": true}
+{"id": "q22", "question": "How long does Autopilot take on a new laptop?", "expected_doc": "laptop-setup.md", "must_include": ["30"], "answerable": true}
+{"id": "q23", "question": "Can I get admin rights on my laptop?", "expected_doc": "laptop-setup.md", "must_include": ["4 hours|temporary"], "answerable": true}
+{"id": "q24", "question": "How do I request software that isn't in Software Center?", "expected_doc": "software-requests.md", "must_include": ["it portal|portal"], "answerable": true}
+{"id": "q25", "question": "How long does the security review for new software take?", "expected_doc": "software-requests.md", "must_include": ["5 business days"], "answerable": true}
+{"id": "q26", "question": "My C drive is almost full, how do I free space?", "expected_doc": "disk-space.md", "must_include": ["disk cleanup|onedrive"], "answerable": true}
+{"id": "q27", "question": "My screen says BitLocker recovery, where do I find the key?", "expected_doc": "bitlocker.md", "must_include": ["myaccount.example.com"], "answerable": true}
+{"id": "q28", "question": "When is a departing employee's account disabled?", "expected_doc": "onboarding-offboarding.md", "must_include": ["18:00"], "answerable": true}
+{"id": "q29", "question": "How far in advance should managers request a new hire's laptop?", "expected_doc": "onboarding-offboarding.md", "must_include": ["5 business days"], "answerable": true}
+{"id": "q30", "question": "The meeting room TV shows no signal", "expected_doc": "teams-meetings.md", "must_include": ["hdmi|input|share"], "answerable": true}
+{"id": "q31", "question": "What is the Service Desk phone extension?", "expected_doc": "it-support-hours.md", "must_include": ["4357"], "answerable": true}
+{"id": "q32", "question": "How do I restore an older version of a file in OneDrive?", "expected_doc": "shared-drives.md", "must_include": ["version history"], "answerable": true}
+{"id": "oos01", "question": "What is the capital of France?", "expected_doc": null, "must_include": [], "answerable": false}
+{"id": "oos02", "question": "Can you recommend a good pizza place in Tijuana?", "expected_doc": null, "must_include": [], "answerable": false}
+{"id": "oos03", "question": "How many vacation days do I get per year?", "expected_doc": null, "must_include": [], "answerable": false}
+{"id": "oos04", "question": "What is the stock price of the company today?", "expected_doc": null, "must_include": [], "answerable": false}
+{"id": "oos05", "question": "Write me a poem about the ocean", "expected_doc": null, "must_include": [], "answerable": false}
+{"id": "oos06", "question": "How do I configure BGP on a Cisco router?", "expected_doc": null, "must_include": [], "answerable": false}
+{"id": "oos07", "question": "What's the cafeteria menu for Friday?", "expected_doc": null, "must_include": [], "answerable": false}
+{"id": "oos08", "question": "How do I file my taxes in Mexico?", "expected_doc": null, "must_include": [], "answerable": false}
