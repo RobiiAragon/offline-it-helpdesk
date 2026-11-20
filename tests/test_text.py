@@ -107,3 +107,19 @@ def test_bm25_prefers_matching_document() -> None:
     scores = bm.scores("what is the vpn portal?")
     assert scores.argmax() == 1
     assert "the" not in terms("the vpn")
+
+
+def test_code_fence_comments_are_not_headings() -> None:
+    md = (
+        "# VPN\n\n## Linux\n\nRun this:\n\n```bash\n# restart the client\n"
+        "sudo systemctl restart vpn\n```\n\nThen reconnect.\n"
+    )
+    chunks = chunk_markdown("vpn.md", md)
+    assert [c.section for c in chunks] == ["Linux"]
+    assert "# restart the client" in chunks[0].text and "Then reconnect." in chunks[0].text
+
+
+def test_new_title_resets_section() -> None:
+    md = "# First\n\n## Steps\n\nDo A.\n\n# Second\n\nIntro of the second doc.\n"
+    chunks = chunk_markdown("multi.md", md)
+    assert [(c.title, c.section) for c in chunks] == [("First", "Steps"), ("Second", "")]

@@ -10,6 +10,7 @@ from pathlib import Path
 
 HF = "https://huggingface.co"
 MINILM_REV = "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
+VOCAB_SHA256 = "07eced375cec144d27c900241f3e339478dec958f92fddbc551f295c992038a3"
 
 
 @dataclass(frozen=True)
@@ -33,7 +34,7 @@ EMBEDDERS: dict[str, dict[str, Asset]] = {
         "vocab": Asset(
             f"{HF}/sentence-transformers/all-MiniLM-L6-v2/resolve/{MINILM_REV}/vocab.txt",
             "all-MiniLM-L6-v2.vocab.txt",
-            None,
+            VOCAB_SHA256,
             0.2,
             "Apache-2.0",
         ),
@@ -49,7 +50,7 @@ EMBEDDERS: dict[str, dict[str, Asset]] = {
         "vocab": Asset(
             f"{HF}/sentence-transformers/all-MiniLM-L6-v2/resolve/{MINILM_REV}/vocab.txt",
             "all-MiniLM-L6-v2.vocab.txt",
-            None,
+            VOCAB_SHA256,
             0.2,
             "Apache-2.0",
         ),
@@ -89,14 +90,18 @@ def fetch(asset: Asset, dest_dir: Path) -> Path:
         return target
     tmp = target.with_suffix(target.suffix + ".part")
     print(f"downloading {asset.filename} ({asset.size_mb:,.1f} MB, {asset.license})")
-    with urllib.request.urlopen(asset.url, timeout=60) as resp, tmp.open("wb") as out:
-        total = int(resp.headers.get("Content-Length") or 0)
-        done = 0
-        while chunk := resp.read(1 << 20):
-            out.write(chunk)
-            done += len(chunk)
-            if total and sys.stdout.isatty():
-                print(f"\r  {done / total:6.1%}", end="", flush=True)
+    try:
+        with urllib.request.urlopen(asset.url, timeout=60) as resp, tmp.open("wb") as out:
+            total = int(resp.headers.get("Content-Length") or 0)
+            done = 0
+            while chunk := resp.read(1 << 20):
+                out.write(chunk)
+                done += len(chunk)
+                if total and sys.stdout.isatty():
+                    print(f"\r  {done / total:6.1%}", end="", flush=True)
+    except BaseException:  # interrupted or failed: don't leave a half-written .part file
+        tmp.unlink(missing_ok=True)
+        raise
     if sys.stdout.isatty():
         print()
     if asset.sha256 and (got := sha256_file(tmp)) != asset.sha256:

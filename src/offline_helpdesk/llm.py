@@ -56,8 +56,15 @@ class OpenAICompatLLM:
         try:
             with urllib.request.urlopen(req, timeout=self.timeout) as resp:
                 return json.loads(resp.read())
+        except urllib.error.HTTPError as exc:  # server is up but rejected the request
+            body = exc.read().decode("utf-8", errors="replace")[:300]
+            raise LLMUnavailable(
+                f"{self.name} at {self.url} returned HTTP {exc.code}: {body}"
+            ) from exc
         except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
             raise LLMUnavailable(f"{self.name} at {self.url} is not reachable: {exc}") from exc
+        except ValueError as exc:  # not JSON
+            raise LLMUnavailable(f"{self.name} at {self.url} sent invalid JSON: {exc}") from exc
 
     def health(self) -> str:
         try:
@@ -83,7 +90,12 @@ class OpenAICompatLLM:
                 "stream": False,
             },
         )
-        text = data["choices"][0]["message"]["content"].strip()
+        try:
+            text = (data["choices"][0]["message"]["content"] or "").strip()
+        except (KeyError, IndexError, TypeError) as exc:
+            raise LLMUnavailable(
+                f"{self.name} at {self.url} sent an unexpected response: {str(data)[:300]}"
+            ) from exc
         usage = data.get("usage") or {}
         return Generation(
             text,

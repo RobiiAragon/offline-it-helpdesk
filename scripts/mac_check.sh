@@ -42,6 +42,8 @@ helpdesk eval --llm "$LLM" --out "eval/results/local-mac-$LLM.json"
 echo "==> API smoke test"
 helpdesk serve --llm "$LLM" --port 8765 > /dev/null 2>&1 &
 API=$!
+# stop the API (and llama-server if we started it) even when a check below fails
+trap 'kill "$API" 2>/dev/null || true; [[ -n "$STARTED" ]] && kill "$STARTED" 2>/dev/null || true' EXIT
 for _ in $(seq 1 40); do curl -sf http://127.0.0.1:8765/health >/dev/null && break; sleep 0.5; done
 curl -sf http://127.0.0.1:8765/health && echo
 curl -sf -X POST http://127.0.0.1:8765/ask -H 'Content-Type: application/json' \

@@ -1,0 +1,26 @@
+# docker compose up                      -> API + UI on http://127.0.0.1:8000 (extractive, no LLM)
+# HELPDESK_LLM=llamacpp docker compose --profile llm up
+#                                        -> also starts llama.cpp with Qwen2.5-0.5B (CPU)
+#
+# The llm profile expects the GGUF in ./models (helpdesk download --llm qwen2.5-0.5b
+# with HELPDESK_CACHE=./models, or copy it from ~/.cache/offline-it-helpdesk).
+# On macOS, Docker cannot use Metal: for GPU speed run llama-server natively
+# (scripts/start_llm.sh) and point the API at it with HELPDESK_LLM_URL.
+services:
+  helpdesk:
+    build: .
+    image: offline-it-helpdesk
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      HELPDESK_LLM: ${HELPDESK_LLM:-extractive}
+      HELPDESK_LLM_URL: ${HELPDESK_LLM_URL:-http://llm:8080/v1}
+
+  llm:
+    profiles: ["llm"]
+    image: ghcr.io/ggml-org/llama.cpp:server
+    command: >
+      -m /models/qwen2.5-0.5b-instruct-q4_k_m.gguf
+      --host 0.0.0.0 --port 8080 -c 4096 --temp 0
+    volumes:
+      - ./models:/models:ro

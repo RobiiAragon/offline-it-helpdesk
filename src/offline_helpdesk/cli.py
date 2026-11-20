@@ -13,6 +13,11 @@ from . import __version__, download
 from .config import Settings
 
 
+def _pick(value, default):
+    """CLI value if given (even 0 / 0.0), else the setting. ``or`` would drop 0."""
+    return default if value is None else value
+
+
 def _assistant(args: argparse.Namespace, s: Settings):
     from . import embedder, llm
     from .index import Index
@@ -25,9 +30,9 @@ def _assistant(args: argparse.Namespace, s: Settings):
     return Assistant(
         index,
         model,
-        top_k=args.top_k or s.top_k,
-        min_score=args.min_score or s.min_score,
-        max_tokens=s.max_tokens,
+        top_k=_pick(args.top_k, s.top_k),
+        min_score=_pick(args.min_score, s.min_score),
+        max_tokens=_pick(args.max_tokens, s.max_tokens),
         fallback_score=fallback,
     )
 
@@ -159,6 +164,13 @@ def cmd_doctor(args: argparse.Namespace, s: Settings) -> int:
     return 0
 
 
+def _positive_int(text: str) -> int:
+    value = int(text)
+    if value < 1:
+        raise argparse.ArgumentTypeError(f"must be >= 1, got {value}")
+    return value
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="helpdesk", description="Offline IT helpdesk assistant")
     p.add_argument("--version", action="version", version=__version__)
@@ -171,7 +183,8 @@ def build_parser() -> argparse.ArgumentParser:
     common.add_argument("--llm-url")
     common.add_argument("--llm-model")
     common.add_argument("--min-score", type=float)
-    common.add_argument("--top-k", type=int)
+    common.add_argument("--top-k", type=_positive_int)
+    common.add_argument("--max-tokens", type=_positive_int, help="LLM answer length limit")
     common.add_argument(
         "--no-fallback",
         action="store_true",
