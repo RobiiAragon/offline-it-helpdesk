@@ -21,6 +21,13 @@ class _Handler(BaseHTTPRequestHandler):
         self._send({"object": "list", "data": [{"id": "qwen-test"}]})
 
     def do_POST(self):
+        if self.path.startswith("/bad"):
+            if "http500" in self.path:
+                self.send_response(500)
+                self.end_headers()
+                self.wfile.write(b"model crashed")
+                return
+            return self._send({"error": "no choices here"})
         body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
         assert body["temperature"] == 0.0 and body["messages"][0]["role"] == "system"
         self._send(
@@ -177,3 +184,31 @@ def test_cli_index_ask_eval(tmp_path, capsys) -> None:
     )
     saved = json.loads((tmp_path / "r.json").read_text())
     assert saved["meta"]["embedder"] == "hash" and saved["summary"]["n_answerable"] == 1
+
+
+def test_llm_errors_become_llm_unavailable(fake_server) -> None:
+    base = fake_server.rsplit("/v1", 1)[0]
+    with pytest.raises(llm.LLMUnavailable, match="unexpected response"):
+        llm.make("llamacpp", url=f"{base}/bad").generate("s", "u", 5)
+    with pytest.raises(llm.LLMUnavailable, match="HTTP 500: model crashed"):
+        llm.make("llamacpp", url=f"{base}/bad/http500").generate("s", "u", 5)
+
+
+def test_cli_keeps_zero_overrides(monkeypatch) -> None:
+    from offline_helpdesk import cli
+
+    args = cli.build_parser().parse_args(
+        ["ask", "--embedder", "hash", "--llm", "extractive", "--min-score", "0", "q"]
+    )
+    monkeypatch.setattr("offline_helpdesk.index.Index.load", lambda path, emb: object())
+    assistant = cli._assistant(args, cli.Settings())
+    assert assistant.min_score == 0.0  # `or` used to silently fall back to 0.35
+    with pytest.raises(SystemExit):
+        cli.build_parser().parse_args(["ask", "--top-k", "0", "q"])
+
+
+def test_failed_download_leaves_no_part_file(tmp_path) -> None:
+    missing = download.Asset((tmp_path / "nope.bin").as_uri(), "x.bin", None, 0.0, "MIT")
+    with pytest.raises(OSError):
+        download.fetch(missing, tmp_path / "cache")
+    assert list((tmp_path / "cache").iterdir()) == []
