@@ -90,6 +90,8 @@ become citable chunks.
 
 Settings can also come from environment variables: `HELPDESK_LLM`, `HELPDESK_LLM_URL`,
 `HELPDESK_TOP_K`, `HELPDESK_MIN_SCORE`, `HELPDESK_FALLBACK_SCORE`, `HELPDESK_PROVIDERS`, …
+Flags win over environment variables (`--top-k`, `--min-score`, `--max-tokens`; `--min-score 0`
+really disables the refusal guard).
 
 ## Results: measured on my Mac
 
@@ -129,8 +131,8 @@ the Mac was doing.*
    "Connecting" instead of "Troubleshooting") or by declining.
 2. **INT8 embeddings are free here.** The 23 MB INT8 MiniLM retrieves exactly as well as the
    90 MB FP32 model on this KB.
-3. **Small LLMs decline answerable questions.** Without the fallback, Qwen 1.5B refused 3/32
-   answerable questions even though retrieval had found the right section. Falling back to the
+3. **Small LLMs decline answerable questions.** Without the fallback, Qwen 1.5B refused 3/32 (top_k = 4)
+   to 4/32 (top_k = 3) answerable questions even though retrieval had found the right section. Falling back to the
    verbatim passage when the LLM declines but similarity is ≥ 0.5 removed every false refusal
    and kept 100% of out-of-scope questions refused.
 4. **0.5B vs 1.5B:** the 0.5B model (the tablet-sized one) is 1.3× faster per token but loses
@@ -157,6 +159,21 @@ and writes `eval/results/android-<model>-qwen2.5-0.5b.json`. Options: `MODEL=qwe
 `THREADS=8`, `PROVIDERS=cpu`. FastAPI is skipped on Termux because `pydantic-core` has no
 Android wheel; the CLI covers `ask` and `eval`.
 
+## Docker
+
+```bash
+docker compose up --build        # API + UI on http://127.0.0.1:8000, extractive mode
+```
+
+The image bakes in the 23 MB embedder and the index, runs as a non-root user and needs no
+network at runtime: CI builds it and checks that it answers with `--network none`. The
+port is published on `127.0.0.1` only. To add a local LLM, put the GGUF in `./models`
+and run `HELPDESK_LLM=llamacpp docker compose --profile llm up`, which starts llama.cpp's
+server image on the CPU. On a Mac, Docker can't use Metal, so for speed run
+`scripts/start_llm.sh` natively and set `HELPDESK_LLM=llamacpp
+HELPDESK_LLM_URL=http://host.docker.internal:8080/v1`. The numbers above were measured
+natively, not in Docker.
+
 ## API
 
 ```bash
@@ -181,13 +198,14 @@ authentication: llama-server and this API have no API key.
 
 ```bash
 pip install -e ".[dev]"
-ruff check . && ruff format --check . && pytest -q   # 20 tests, < 1 s, no downloads
+ruff check . && ruff format --check . && pytest -q   # 25 tests, < 2 s, no downloads
 scripts/mac_check.sh                                  # lint, tests, index, LLM, eval, API smoke test
 ```
 
-CI (ubuntu + macOS, Python 3.11/3.12) runs lint and the tests, then downloads the real
+CI (ubuntu + macOS, Python 3.11–3.13) runs lint and the tests, then downloads the real
 23 MB ONNX embedder and **fails if retrieval hit@k drops below 95% or out-of-scope
-refusals drop below 85%**.
+refusals drop below 85%**. A second job builds the Docker image and smoke-tests `/ask`,
+including with networking disabled.
 
 ```
 src/offline_helpdesk/

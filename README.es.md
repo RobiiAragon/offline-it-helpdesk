@@ -120,7 +120,7 @@ de calidad salieron idénticas y la generación p50 varió entre 92 y 122 ms.*
 2. **Los embeddings INT8 no cuestan nada aquí.** MiniLM INT8 (23 MB) recupera igual que FP32
    (90 MB) en esta KB.
 3. **Los LLMs chicos se niegan a contestar preguntas que sí tienen respuesta.** Sin el
-   fallback, Qwen 1.5B rechazó 3 de 32 aunque la recuperación había encontrado la sección
+   fallback, Qwen 1.5B rechazó de 3 (top_k = 4) a 4 (top_k = 3) de 32 aunque la recuperación había encontrado la sección
    correcta. Usar el pasaje textual cuando el LLM se niega pero la similitud es ≥ 0.5 eliminó
    todos los rechazos falsos y se siguió rechazando el 100% de las preguntas fuera de alcance.
 4. **0.5B vs 1.5B:** el modelo de 0.5B (el que cabe bien en la tablet) es 1.3× más rápido por
@@ -150,16 +150,32 @@ indexa con el EP XNNPACK, levanta `llama-server` en CPU, corre la evaluación co
 `PROVIDERS=cpu`. En Termux no se instala FastAPI porque `pydantic-core` no tiene wheel para
 Android; la CLI cubre `ask` y `eval`.
 
+## Docker
+
+```bash
+docker compose up --build        # API + UI en http://127.0.0.1:8000, modo extractivo
+```
+
+La imagen trae el embedder de 23 MB y el índice, corre con un usuario sin privilegios y no
+necesita red al ejecutarse: el CI la construye y revisa que conteste con `--network none`. El
+puerto solo se publica en `127.0.0.1`. Para agregar un LLM local, pon el GGUF en `./models` y
+corre `HELPDESK_LLM=llamacpp docker compose --profile llm up`, que levanta la imagen del
+servidor de llama.cpp en CPU. En Mac, Docker no puede usar Metal; para que sea rápido corre
+`scripts/start_llm.sh` nativo y usa `HELPDESK_LLM=llamacpp
+HELPDESK_LLM_URL=http://host.docker.internal:8080/v1`. Los números de arriba se midieron de
+forma nativa, no en Docker.
+
 ## Desarrollo
 
 ```bash
 pip install -e ".[dev]"
-ruff check . && ruff format --check . && pytest -q   # 20 pruebas, < 1 s, sin descargas
+ruff check . && ruff format --check . && pytest -q   # 25 pruebas, < 2 s, sin descargas
 scripts/mac_check.sh                                  # lint, pruebas, índice, LLM, eval y API
 ```
 
-El CI (ubuntu + macOS, Python 3.11/3.12) corre lint y pruebas, descarga el embedder ONNX real
+El CI (ubuntu + macOS, Python 3.11–3.13) corre lint y pruebas, descarga el embedder ONNX real
 y **falla si el hit@k de recuperación baja de 95% o si los rechazos fuera de alcance bajan de 85%**.
+Otro job construye la imagen de Docker y prueba `/ask`, incluso sin red.
 
 Todo escucha en `127.0.0.1` por defecto. Si lo expones en una red, ponlo detrás de
 autenticación, porque ni llama-server ni esta API tienen API key.
