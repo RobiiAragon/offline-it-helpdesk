@@ -7,6 +7,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 HEADING = re.compile(r"^(#{1,3})\s+(.*)$")
+FENCE = re.compile(r"^\s*(```|~~~)")
 
 
 @dataclass
@@ -43,19 +44,24 @@ def _split_long(text: str, max_chars: int) -> list[str]:
 
 def chunk_markdown(doc: str, markdown: str, max_chars: int = 1200) -> list[Chunk]:
     title, section, buf = Path(doc).stem.replace("-", " ").title(), "", []
-    sections: list[tuple[str, str]] = []
+    sections: list[tuple[str, str, str]] = []  # (title, section, body)
 
     def flush() -> None:
         body = "\n".join(buf).strip()
         if body:
-            sections.append((section, body))
+            sections.append((title, section, body))
         buf.clear()
 
+    in_fence = False
     for line in markdown.splitlines():
-        m = HEADING.match(line)
+        if FENCE.match(line):
+            in_fence = not in_fence
+        # "# comment" lines inside ``` code blocks are not headings.
+        m = None if in_fence else HEADING.match(line)
         if m and len(m.group(1)) == 1:
             flush()
             title = m.group(2).strip()
+            section = ""  # a new document title starts with its intro, not the old section
         elif m:
             flush()
             section = m.group(2).strip()
@@ -64,9 +70,9 @@ def chunk_markdown(doc: str, markdown: str, max_chars: int = 1200) -> list[Chunk
     flush()
 
     chunks: list[Chunk] = []
-    for sec, body in sections:
+    for head, sec, body in sections:
         for part in _split_long(body, max_chars):
-            chunks.append(Chunk(f"{Path(doc).stem}#{len(chunks)}", doc, title, sec, part))
+            chunks.append(Chunk(f"{Path(doc).stem}#{len(chunks)}", doc, head, sec, part))
     return chunks
 
 
