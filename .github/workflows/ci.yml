@@ -11,7 +11,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        python: ["3.11", "3.12"]
+        python: ["3.11", "3.12", "3.13"]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -39,3 +39,43 @@ jobs:
           assert s["oos_refusal_rate"] >= 0.85, s
           print("retrieval gate passed")
           PY
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t offline-it-helpdesk .
+      - name: Smoke test the container (published port)
+        run: |
+          docker run -d --name hd-net -p 127.0.0.1:8000:8000 offline-it-helpdesk
+          for _ in $(seq 1 30); do curl -sf http://127.0.0.1:8000/health && break; sleep 1; done
+          echo
+          curl -sf -X POST http://127.0.0.1:8000/ask -H 'Content-Type: application/json' \
+            -d '{"question":"How long are print jobs kept?"}' > ask.json
+          python3 -c "import json; a=json.load(open('ask.json')); print(a['answer']); assert not a['refused'] and a['citations'], a"
+      - name: Smoke test with networking disabled (fully offline)
+        run: |
+          docker run -d --name hd-offline --network none offline-it-helpdesk
+          cat > probe.py <<'PY'
+          import json, time, urllib.request
+          for _ in range(30):
+              try:
+                  urllib.request.urlopen("http://127.0.0.1:8000/health", timeout=2)
+                  break
+              except OSError:
+                  time.sleep(1)
+          req = urllib.request.Request(
+              "http://127.0.0.1:8000/ask",
+              data=json.dumps({"question": "How do I reset my password?"}).encode(),
+              headers={"Content-Type": "application/json"},
+          )
+          a = json.load(urllib.request.urlopen(req, timeout=10))
+          print(a["answer"][:160])
+          assert not a["refused"], a
+          PY
+          docker cp probe.py hd-offline:/tmp/probe.py
+          docker exec hd-offline python /tmp/probe.py
+      - name: Container logs
+        if: always()
+        run: docker logs hd-net; docker logs hd-offline || true
